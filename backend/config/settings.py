@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
+    'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
     
@@ -39,6 +40,8 @@ INSTALLED_APPS = [
     # Local apps (to be added)
     'users',
     'matches',
+    'payments',
+'tickets'
 ]
 
 MIDDLEWARE = [

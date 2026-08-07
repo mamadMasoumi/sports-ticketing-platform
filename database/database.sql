@@ -196,11 +196,7 @@ CREATE TABLE Matches(
     FOREIGN KEY(away_team_id)
     REFERENCES Teams(id)
     ON DELETE RESTRICT
-    ON UPDATE CASCADE,
-
-	CONSTRAINT chk_teams_diff
-    CHECK (home_team_id <> away_team_id)
-
+    ON UPDATE CASCADE
 );
 
 
@@ -494,13 +490,8 @@ CREATE TABLE Reports(
 		FOREIGN KEY(ticket_id)
 		REFERENCES Tickets(id)
         ON DELETE SET NULL
-        ON UPDATE CASCADE,
-	
-    CHECK(
-    reservation_id IS NOT NULL
-    OR
-    ticket_id IS NOT NULL
-	)
+        ON UPDATE CASCADE
+
 
 );
 

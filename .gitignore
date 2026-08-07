@@ -12,3 +12,26 @@ Thumbs.db
 *.tmp
 *.bak
 *~
+
+# Environment & Secret variables
+.env
+*.env
+
+# Python Virtual Environments
+.venv/
+venv/
+env/
+
+# Database
+*.sqlite3
+db.sqlite3
+
+# Python Bytecode & Caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Django / Local Media & Static
+local_settings.py
+staticfiles/
+media/
