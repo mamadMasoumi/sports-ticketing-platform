@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     
     # Local apps (to be added)
     'users',
+    'matches',
 ]
 
 MIDDLEWARE = [
