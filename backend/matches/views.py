@@ -6,6 +6,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from .repositories.match_repository import MatchRepository
 from .services.reservation_service import ReservationService
 
+from matches.services.reservation_cancellation_service import ReservationCancellationService
+from matches.serializers import CancelReservationSerializer
 
 class MatchListView(APIView):
     permission_classes = [AllowAny]
@@ -35,26 +37,60 @@ class ReserveTicketView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user_id = request.user["id"]
-        match_id = request.data.get("match_id")
-        seat_number = request.data.get("seat_number")
-        ticket_type_id = request.data.get("ticket_type_id")
-
-        if not all([match_id, seat_number, ticket_type_id]):
+        ticket_id = request.data.get("ticket_id")
+        if not ticket_id:
             return Response(
-                {"success": False, "error": "match_id, seat_number, ticket_type_id are required"},
+                {"success": False, "error": "ticket_id is required"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
             reservation_id = ReservationService.reserve_ticket(
-                user_id, match_id, seat_number, ticket_type_id
+                user_id=request.user.id,     # fixed from request.user["id"]
+                ticket_id=ticket_id
             )
             return Response(
                 {"success": True, "reservation_id": reservation_id},
                 status=status.HTTP_201_CREATED
             )
         except ValueError as e:
-            return Response({"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"success": False, "error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         except Exception as e:
-            return Response({"success": False, "error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"success": False, "error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class CancelReservationView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = CancelReservationSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"success": False, "error": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            result = ReservationCancellationService.cancel_reservation(
+                user_id=request.user.id,
+                reservation_id=serializer.validated_data['reservation_id']
+            )
+            return Response(
+                {"success": True, "data": result},
+                status=status.HTTP_200_OK
+            )
+        except ValueError as e:
+            return Response(
+                {"success": False, "error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {"success": False, "error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

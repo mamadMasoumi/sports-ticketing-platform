@@ -5,6 +5,9 @@ DROP PROCEDURE IF EXISTS GetAllMatches;
 DROP PROCEDURE IF EXISTS GetAllPayments;
 DROP PROCEDURE IF EXISTS GetAllReservations;
 DROP PROCEDURE IF EXISTS CountUsers;
+DROP PROCEDURE IF EXISTS CountReservations;
+DROP PROCEDURE IF EXISTS GetRemainingCapacity;
+DROP PROCEDURE IF EXISTS GetUserFullName;
 
 -- ==========================================
 -- STORED PROCEDURES
