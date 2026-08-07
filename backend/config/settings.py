@@ -124,7 +124,7 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        # JWT authentication will be implemented here
+        'users.authentication.JWTAuthentication',
     ],
 }
 
