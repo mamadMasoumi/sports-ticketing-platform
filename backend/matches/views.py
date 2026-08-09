@@ -2,12 +2,15 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from datetime import datetime, date
+from decimal import Decimal
 
 from .repositories.match_repository import MatchRepository
+from .repositories.reservation_repository import ReservationRepository  # <-- new import
 from .services.reservation_service import ReservationService
-
 from matches.services.reservation_cancellation_service import ReservationCancellationService
 from matches.serializers import CancelReservationSerializer
+
 
 class MatchListView(APIView):
     permission_classes = [AllowAny]
@@ -43,10 +46,9 @@ class ReserveTicketView(APIView):
                 {"success": False, "error": "ticket_id is required"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         try:
             reservation_id = ReservationService.reserve_ticket(
-                user_id=request.user.id,     # fixed from request.user["id"]
+                user_id=request.user.id,
                 ticket_id=ticket_id
             )
             return Response(
@@ -64,6 +66,7 @@ class ReserveTicketView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+
 class CancelReservationView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -74,7 +77,6 @@ class CancelReservationView(APIView):
                 {"success": False, "error": serializer.errors},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         try:
             result = ReservationCancellationService.cancel_reservation(
                 user_id=request.user.id,
@@ -94,3 +96,32 @@ class CancelReservationView(APIView):
                 {"success": False, "error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class UserBookingsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        status_filter = request.query_params.get('status_filter')
+        # Basic validation
+        if status_filter and status_filter not in ('Reserved', 'Paid', 'Canceled', 'Expired'):
+            return Response(
+                {"success": False, "error": "Invalid status_filter value."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            rows = ReservationRepository.get_user_reservations(
+                user_id=request.user.id,
+                status_filter=status_filter
+            )
+            # Serialise datetime/Decimal for JSON output
+            for row in rows:
+                for key, value in row.items():
+                    if isinstance(value, (datetime, date)):
+                        row[key] = value.isoformat()
+                    elif isinstance(value, Decimal):
+                        row[key] = float(value)
+
+            return Response({"success": True, "data": rows}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"success": False, "error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
