@@ -6,10 +6,10 @@ from datetime import datetime, date
 from decimal import Decimal
 
 from .repositories.match_repository import MatchRepository
-from .repositories.reservation_repository import ReservationRepository  # <-- new import
+from .repositories.reservation_repository import ReservationRepository
 from .services.reservation_service import ReservationService
 from matches.services.reservation_cancellation_service import ReservationCancellationService
-from matches.serializers import CancelReservationSerializer
+from matches.serializers import CancelReservationSerializer, ReserveTicketSerializer
 
 
 class MatchListView(APIView):
@@ -40,16 +40,17 @@ class ReserveTicketView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        ticket_id = request.data.get("ticket_id")
-        if not ticket_id:
+        serializer = ReserveTicketSerializer(data=request.data)
+        if not serializer.is_valid():
             return Response(
-                {"success": False, "error": "ticket_id is required"},
+                {"success": False, "error": serializer.errors},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
         try:
             reservation_id = ReservationService.reserve_ticket(
                 user_id=request.user.id,
-                ticket_id=ticket_id
+                ticket_id=serializer.validated_data["ticket_id"]
             )
             return Response(
                 {"success": True, "reservation_id": reservation_id},
@@ -103,7 +104,6 @@ class UserBookingsView(APIView):
 
     def get(self, request):
         status_filter = request.query_params.get('status_filter')
-        # Basic validation
         if status_filter and status_filter not in ('Reserved', 'Paid', 'Canceled', 'Expired'):
             return Response(
                 {"success": False, "error": "Invalid status_filter value."},
@@ -114,14 +114,12 @@ class UserBookingsView(APIView):
                 user_id=request.user.id,
                 status_filter=status_filter
             )
-            # Serialise datetime/Decimal for JSON output
             for row in rows:
                 for key, value in row.items():
                     if isinstance(value, (datetime, date)):
                         row[key] = value.isoformat()
                     elif isinstance(value, Decimal):
                         row[key] = float(value)
-
             return Response({"success": True, "data": rows}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"success": False, "error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
