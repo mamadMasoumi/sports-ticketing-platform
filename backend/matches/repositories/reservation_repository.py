@@ -94,3 +94,10 @@ class ReservationRepository:
             rows = cursor.fetchall()
 
         return [dict(zip(columns, row)) for row in rows]
+
+    @staticmethod
+    def set_support_id(cursor, reservation_id, support_user_id):
+        cursor.execute(
+            "UPDATE Reservations SET support_id = %s WHERE id = %s",
+            [support_user_id, reservation_id]
+        )

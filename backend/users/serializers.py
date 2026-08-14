@@ -39,3 +39,17 @@ class VerifyOTPSerializer(serializers.Serializer):
         if not re.match(r'^09\d{9}$', value):
             raise serializers.ValidationError("Phone number must match the format 09XXXXXXXXX.")
         return value
+
+class UserUpdateSerializer(serializers.Serializer):
+    first_name = serializers.CharField(max_length=100, required=False)
+    last_name = serializers.CharField(max_length=100, required=False)
+    email = serializers.EmailField(max_length=100, required=False)
+    phone = serializers.CharField(max_length=20, required=False)
+    city_id = serializers.IntegerField(required=False)
+    birth_date = serializers.DateField(required=False, allow_null=True)
+    profile_image = serializers.CharField(max_length=255, required=False, allow_blank=True)
+
+    def validate_phone(self, value):
+        if value and not re.match(r'^09\d{9}$', value):
+            raise serializers.ValidationError("Phone number must match the format 09XXXXXXXXX.")
+        return value

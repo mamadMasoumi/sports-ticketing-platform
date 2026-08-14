@@ -49,3 +49,31 @@ class ReportRepository:
                 return None
             cols = [c[0] for c in cursor.description]
             return dict(zip(cols, row))
+
+    @staticmethod
+    def get_all_reports(status_filter=None):
+        query = """
+                SELECT r.id, r.user_id, r.reservation_id, r.ticket_id, r.category,
+                       r.description, r.status, r.created_at,
+                       u.first_name, u.last_name, u.email
+                FROM Reports r
+                JOIN Users u ON r.user_id = u.id
+            """
+        params = []
+        if status_filter is not None:
+            query += " WHERE r.status = %s"
+            params.append(status_filter)
+        query += " ORDER BY r.created_at DESC"
+
+        with connection.cursor() as cursor:
+            cursor.execute(query, params)
+            cols = [c[0] for c in cursor.description]
+            rows = cursor.fetchall()
+            return [dict(zip(cols, row)) for row in rows]
+
+    @staticmethod
+    def update_report_status(report_id, new_status):
+        query = "UPDATE Reports SET status = %s WHERE id = %s"
+        with connection.cursor() as cursor:
+            cursor.execute(query, [new_status, report_id])
+            return cursor.rowcount
