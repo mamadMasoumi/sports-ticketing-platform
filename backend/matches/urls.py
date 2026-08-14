@@ -4,7 +4,8 @@ from .views import (
     MatchDetailView,
     ReserveTicketView,
     CancelReservationView,
-    UserBookingsView,          # <-- new
+    UserBookingsView,
+    AdminCancelReservationView,   # <-- new import
 )
 
 urlpatterns = [
@@ -12,5 +13,6 @@ urlpatterns = [
     path('<int:match_id>/', MatchDetailView.as_view()),
     path('reserve/', ReserveTicketView.as_view()),
     path('cancel/', CancelReservationView.as_view(), name='reservation-cancel'),
-    path('bookings/', UserBookingsView.as_view(), name='user-bookings'),   # <-- new
+    path('bookings/', UserBookingsView.as_view(), name='user-bookings'),
+    path('<int:reservation_id>/admin-cancel/', AdminCancelReservationView.as_view(), name='admin-cancel-reservation'),
 ]

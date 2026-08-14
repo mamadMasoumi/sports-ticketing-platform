@@ -405,47 +405,18 @@ CREATE TABLE Reservations(
 -- ==========================================================
 -- TABLE : Payments
 -- ==========================================================
-
 CREATE TABLE Payments(
-
     id INT AUTO_INCREMENT PRIMARY KEY,
-
     reservation_id INT NOT NULL,
-
     user_id INT NOT NULL,
-
     amount DECIMAL(10,2) NOT NULL,
-
-    payment_method ENUM(
-        'BankCard',
-        'Wallet',
-        'Crypto'
-    ) NOT NULL,
-
-    payment_status ENUM(
-        'Pending',
-        'Success',
-        'Failed'
-    ) DEFAULT 'Pending',
-
+    payment_method ENUM( 'BankCard', 'Wallet', 'Crypto' ) NOT NULL,
+    payment_status ENUM( 'Pending', 'Success', 'Failed', 'Refunded' ) DEFAULT 'Pending',
     payment_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-
     transaction_code VARCHAR(120) UNIQUE,
-
-    CONSTRAINT fk_payment_reservation
-        FOREIGN KEY(reservation_id)
-        REFERENCES Reservations(id)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE,
-
-    CONSTRAINT fk_payment_user
-        FOREIGN KEY(user_id)
-        REFERENCES Users(id)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE,
-        
-	CONSTRAINT chk_payment_amount CHECK(amount >= 0)
-
+    CONSTRAINT fk_payment_reservation FOREIGN KEY(reservation_id) REFERENCES Reservations(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_payment_user FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT chk_payment_amount CHECK(amount >= 0)
 );
 
 -- ==========================================================
