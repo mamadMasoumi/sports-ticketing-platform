@@ -405,47 +405,18 @@ CREATE TABLE Reservations(
 -- ==========================================================
 -- TABLE : Payments
 -- ==========================================================
-
 CREATE TABLE Payments(
-
     id INT AUTO_INCREMENT PRIMARY KEY,
-
     reservation_id INT NOT NULL,
-
     user_id INT NOT NULL,
-
     amount DECIMAL(10,2) NOT NULL,
-
-    payment_method ENUM(
-        'BankCard',
-        'Wallet',
-        'Crypto'
-    ) NOT NULL,
-
-    payment_status ENUM(
-        'Pending',
-        'Success',
-        'Failed'
-    ) DEFAULT 'Pending',
-
+    payment_method ENUM( 'BankCard', 'Wallet', 'Crypto' ) NOT NULL,
+    payment_status ENUM( 'Pending', 'Success', 'Failed', 'Refunded' ) DEFAULT 'Pending',
     payment_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-
     transaction_code VARCHAR(120) UNIQUE,
-
-    CONSTRAINT fk_payment_reservation
-        FOREIGN KEY(reservation_id)
-        REFERENCES Reservations(id)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE,
-
-    CONSTRAINT fk_payment_user
-        FOREIGN KEY(user_id)
-        REFERENCES Users(id)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE,
-        
-	CONSTRAINT chk_payment_amount CHECK(amount >= 0)
-
+    CONSTRAINT fk_payment_reservation FOREIGN KEY(reservation_id) REFERENCES Reservations(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_payment_user FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT chk_payment_amount CHECK(amount >= 0)
 );
 
 -- ==========================================================
@@ -698,17 +669,17 @@ INSERT INTO Wallet (user_id, balance) VALUES
 -- ==========================================================
 -- INSERT RESERVATIONS (10 rows, support users are 3 and 9)
 -- ==========================================================
-INSERT INTO Reservations (user_id, ticket_id, status, expire_time, support_id) VALUES
-(1,1,'Paid','2026-08-15 17:30:00',3),
-(2,2,'Reserved','2026-08-18 18:30:00',3),
-(3,3,'Paid','2026-08-20 18:00:00',9),
-(4,4,'Canceled','2026-08-23 16:30:00',9),
-(5,5,'Paid','2026-08-26 19:30:00',3),
-(6,6,'Reserved','2026-09-02 15:30:00',9),
-(7,7,'Paid','2026-09-05 17:30:00',3),
-(8,8,'Reserved','2026-09-10 17:00:00',9),
-(9,9,'Paid','2026-09-14 17:30:00',3),
-(10,10,'Reserved','2026-09-18 17:30:00',9);
+INSERT INTO Reservations (user_id, ticket_id, status, reserve_time, expire_time, support_id) VALUES
+(1,1,'Paid','2026-08-15 17:00:00','2026-08-15 17:30:00',3),
+(2,2,'Reserved','2026-08-18 18:00:00','2026-08-18 18:30:00',3),
+(3,3,'Paid','2026-08-20 17:30:00','2026-08-20 18:00:00',9),
+(4,4,'Canceled','2026-08-23 16:00:00','2026-08-23 16:30:00',9),
+(5,5,'Paid','2026-08-26 19:00:00','2026-08-26 19:30:00',3),
+(6,6,'Reserved','2026-09-02 15:00:00','2026-09-02 15:30:00',9),
+(7,7,'Paid','2026-09-05 17:00:00','2026-09-05 17:30:00',3),
+(8,8,'Reserved','2026-09-10 16:30:00','2026-09-10 17:00:00',9),
+(9,9,'Paid','2026-09-14 17:00:00','2026-09-14 17:30:00',3),
+(10,10,'Reserved','2026-09-18 17:00:00','2026-09-18 17:30:00',9);
 
 -- ==========================================================
 -- INSERT PAYMENTS (10 rows, NULL transaction_code for non-success)

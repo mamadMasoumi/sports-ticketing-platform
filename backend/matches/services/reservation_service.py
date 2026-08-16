@@ -2,12 +2,24 @@ from django.db import connection, transaction
 from django.utils import timezone
 from datetime import timedelta
 
+
 class ReservationService:
+
+    @staticmethod
+    def _make_naive(dt):
+        """
+        Convert an aware datetime to naive (no tzinfo) for safe raw SQL
+        comparison against DATETIME columns.
+        """
+        if dt is None:
+            return None
+        return dt.replace(tzinfo=None)
+
     @staticmethod
     def reserve_ticket(user_id, ticket_id):
         """
-        Reserve a ticket. Checks capacity and creates a reservation with a
-        10-minute expiry.
+        Reserve a ticket. Checks capacity and creates a reservation
+        with a 10-minute expiry.
         """
         with transaction.atomic():
             with connection.cursor() as cursor:
@@ -22,14 +34,20 @@ class ReservationService:
                 if ticket[1] <= 0:
                     raise ValueError("No tickets left.")
 
-                # 2. Check if user already has an active (unexpired) reservation for this ticket
-                #    to prevent double booking (optional, can be removed)
+                # Use naive current time for all raw SQL comparisons/inserts
+                now = ReservationService._make_naive(timezone.now())
+
+                # 2. Prevent double booking by the same user for this ticket
                 cursor.execute(
-                    """SELECT id FROM Reservations
-                       WHERE user_id = %s AND ticket_id = %s
-                         AND status = 'Reserved' AND expire_time > %s
-                       LIMIT 1""",
-                    [user_id, ticket_id, timezone.now()]
+                    """
+                    SELECT id FROM Reservations
+                    WHERE user_id = %s
+                      AND ticket_id = %s
+                      AND status = 'Reserved'
+                      AND expire_time > %s
+                    LIMIT 1
+                    """,
+                    [user_id, ticket_id, now]
                 )
                 if cursor.fetchone():
                     raise ValueError("You already have an active reservation for this ticket.")
@@ -41,11 +59,13 @@ class ReservationService:
                 )
 
                 # 4. Create reservation with expire_time = now + 10 minutes
-                expire_time = timezone.now() + timedelta(minutes=10)
+                expire_time = now + timedelta(minutes=10)
                 cursor.execute(
-                    """INSERT INTO Reservations (user_id, ticket_id, status, reserve_time, expire_time)
-                       VALUES (%s, %s, 'Reserved', %s, %s)""",
-                    [user_id, ticket_id, timezone.now(), expire_time]
+                    """
+                    INSERT INTO Reservations (user_id, ticket_id, status, reserve_time, expire_time)
+                    VALUES (%s, %s, 'Reserved', %s, %s)
+                    """,
+                    [user_id, ticket_id, now, expire_time]
                 )
 
                 return cursor.lastrowid

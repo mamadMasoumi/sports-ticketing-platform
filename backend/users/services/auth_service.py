@@ -106,3 +106,54 @@ class AuthService:
                 'role': user_role
             }
         }
+
+class ProfileService:
+    """
+    Handles user profile updates.
+    """
+
+    ALLOWED_FIELDS = {'first_name', 'last_name', 'email', 'phone', 'city_id', 'birth_date', 'profile_image'}
+
+    @classmethod
+    def update_profile(cls, user_id: int, **fields) -> dict:
+        # Remove None values and fields not allowed
+        filtered = {k: v for k, v in fields.items() if k in cls.ALLOWED_FIELDS and v is not None}
+
+        if not filtered:
+            raise ValueError("No valid fields provided to update.")
+
+        # Unique checks for email and phone
+        if 'email' in filtered:
+            existing = UserRepository.get_user_by_email(filtered['email'])
+            if existing and existing[0] != user_id:
+                raise ValueError("Email is already in use by another account.")
+        if 'phone' in filtered:
+            existing = UserRepository.get_user_by_phone(filtered['phone'])
+            if existing and existing[0] != user_id:
+                raise ValueError("Phone number is already in use by another account.")
+
+        # Perform update
+        rows_updated = UserRepository.update_user(user_id=user_id, **filtered)
+        if rows_updated == 0:
+            raise ValueError("User not found or no changes applied.")
+
+        # Redis cache invalidation skipped — no user-profile cache exists yet.
+
+        # Fetch updated user
+        user_record = UserRepository.get_user_by_id(user_id)
+        if not user_record:
+            raise ValueError("User not found after update.")
+
+        # Build response without password (index 5 is password)
+        return {
+            'id': user_record[0],
+            'first_name': user_record[1],
+            'last_name': user_record[2],
+            'email': user_record[3],
+            'phone': user_record[4],
+            'role': user_record[6],
+            'city_id': user_record[7],
+            'birth_date': user_record[8].isoformat() if user_record[8] else None,
+            'profile_image': user_record[9],
+            'status': user_record[10]
+        }

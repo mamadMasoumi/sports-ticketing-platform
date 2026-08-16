@@ -10,60 +10,63 @@ class ReservationCancellationService:
     Handles cancellation of a reservation, including refunds for paid tickets.
     """
 
-    # Refund percentage tiers based on time until match
-    REFUND_FULL_AFTER_HOURS = 48      # more than 48h → 100%
-    REFUND_PARTIAL_AFTER_HOURS = 24   # 24–48h → 80%
-    # less than 24h → 50%
+    REFUND_FULL_AFTER_HOURS = 48
+    REFUND_PARTIAL_AFTER_HOURS = 24
 
     @classmethod
     def _make_naive(cls, dt):
-        """Convert a datetime to naive (no tzinfo) for safe DB comparison."""
         if dt is None:
             return None
         return dt.replace(tzinfo=None)
 
     @classmethod
-    def cancel_reservation(cls, user_id, reservation_id):
-        # First, handle any expired reservation in a separate atomic block
-        # so that capacity restoration and status change are committed
-        # *before* we raise any user‑facing error.
+    def _handle_expired_if_needed(cls, reservation_id):
+        now = cls._make_naive(timezone.now())
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT id, status, expire_time, ticket_id "
+                    "FROM Reservations WHERE id = %s FOR UPDATE",
+                    [reservation_id]
+                )
+                row = cursor.fetchone()
+                if not row:
+                    return
+                res_id, status, expire_time, ticket_id = row
+                expire_time = cls._make_naive(expire_time)
+                if status in ('Canceled', 'Expired'):
+                    return
+                if expire_time and expire_time < now:
+                    ReservationRepository.restore_ticket_capacity(cursor, ticket_id)
+                    ReservationRepository.update_reservation_status(cursor, res_id, 'Canceled')
+        # Commit happens when atomic block exits.
+
+    @classmethod
+    def _cancel_reservation_impl(cls, user_id, reservation_id, support_user_id=None, enforce_ownership=True):
         cls._handle_expired_if_needed(reservation_id)
 
         with transaction.atomic():
             with connection.cursor() as cursor:
-                row = ReservationRepository.get_reservation_for_cancel(
-                    cursor, reservation_id
-                )
-
+                row = ReservationRepository.get_reservation_for_cancel(cursor, reservation_id)
                 if not row:
                     raise ValueError("Reservation not found.")
 
-                (res_id, res_user_id, ticket_id, status,
-                 expire_time, price, match_date) = row
+                (res_id, res_user_id, ticket_id, status, expire_time, price, match_date) = row
 
-                # Ownership check
-                if res_user_id != user_id:
-                    raise ValueError(
-                        "This reservation does not belong to you."
-                    )
+                if enforce_ownership and res_user_id != user_id:
+                    raise ValueError("This reservation does not belong to you.")
 
-                # State checks (expired already handled above)
                 if status in ('Canceled', 'Expired'):
-                    raise ValueError(
-                        "Reservation is already cancelled/expired."
-                    )
+                    raise ValueError("Reservation is already cancelled/expired.")
 
-                # Proceed with normal cancellation logic
                 now = cls._make_naive(timezone.now())
 
                 if status == 'Reserved':
                     # Unpaid reservation: just cancel, no refund
-                    ReservationRepository.restore_ticket_capacity(
-                        cursor, ticket_id
-                    )
-                    ReservationRepository.update_reservation_status(
-                        cursor, res_id, 'Canceled'
-                    )
+                    ReservationRepository.restore_ticket_capacity(cursor, ticket_id)
+                    ReservationRepository.update_reservation_status(cursor, res_id, 'Canceled')
+                    if support_user_id is not None:
+                        ReservationRepository.set_support_id(cursor, res_id, support_user_id)
                     return {
                         'reservation_id': res_id,
                         'refund_amount': 0,
@@ -71,7 +74,6 @@ class ReservationCancellationService:
                     }
 
                 elif status == 'Paid':
-                    # Paid reservation: calculate refund
                     time_diff = cls._make_naive(match_date) - now
                     hours_until_match = time_diff.total_seconds() / 3600.0
 
@@ -84,32 +86,26 @@ class ReservationCancellationService:
 
                     refund_amount = float(price) * percentage
 
-                    # Update wallet
+                    # Credit the original ticket owner (not the admin)
                     cursor.execute(
-                        "UPDATE Wallet SET balance = balance + %s "
-                        "WHERE user_id = %s",
-                        [refund_amount, user_id]
+                        "UPDATE Wallet SET balance = balance + %s WHERE user_id = %s",
+                        [refund_amount, res_user_id]
                     )
 
                     # Record refund payment
                     PaymentRepository.create_payment(
                         reservation_id=res_id,
-                        user_id=user_id,
+                        user_id=res_user_id,
                         amount=refund_amount,
                         method='Wallet',
                         status='Refunded',
                         transaction_code=None
                     )
 
-                    # Restore capacity
-                    ReservationRepository.restore_ticket_capacity(
-                        cursor, ticket_id
-                    )
-
-                    # Cancel reservation
-                    ReservationRepository.update_reservation_status(
-                        cursor, res_id, 'Canceled'
-                    )
+                    ReservationRepository.restore_ticket_capacity(cursor, ticket_id)
+                    ReservationRepository.update_reservation_status(cursor, res_id, 'Canceled')
+                    if support_user_id is not None:
+                        ReservationRepository.set_support_id(cursor, res_id, support_user_id)
 
                     return {
                         'reservation_id': res_id,
@@ -118,47 +114,24 @@ class ReservationCancellationService:
                     }
 
                 else:
-                    raise ValueError(
-                        "Reservation cannot be cancelled in its current state."
-                    )
+                    raise ValueError("Reservation cannot be cancelled in its current state.")
 
     @classmethod
-    def _handle_expired_if_needed(cls, reservation_id):
-        """
-        Checks whether the reservation is expired. If so, restores ticket
-        capacity and sets status to 'Canceled' in its own short transaction
-        that is guaranteed to commit, then raises an error.
-        """
-        now = cls._make_naive(timezone.now())
+    def cancel_reservation(cls, user_id, reservation_id):
+        """Cancel a reservation as its owner."""
+        return cls._cancel_reservation_impl(
+            user_id=user_id,
+            reservation_id=reservation_id,
+            support_user_id=None,
+            enforce_ownership=True
+        )
 
-        with transaction.atomic():
-            with connection.cursor() as cursor:
-                # Lock the reservation to read expiry
-                cursor.execute(
-                    "SELECT id, status, expire_time, ticket_id "
-                    "FROM Reservations WHERE id = %s FOR UPDATE",
-                    [reservation_id]
-                )
-                row = cursor.fetchone()
-                if not row:
-                    return  # will be caught later
-
-                res_id, status, expire_time, ticket_id = row
-                expire_time = cls._make_naive(expire_time)
-
-                if status in ('Canceled', 'Expired'):
-                    return  # already dead, let the main method reject it
-
-                if expire_time and expire_time < now:
-                    # Expired – restore capacity and mark cancelled
-                    ReservationRepository.restore_ticket_capacity(
-                        cursor, ticket_id
-                    )
-                    ReservationRepository.update_reservation_status(
-                        cursor, res_id, 'Canceled'
-                    )
-                    # Commit happens automatically when this atomic block exits
-                    # without an exception. Then we raise outside.
-                    return
-
-        # If we get here, the reservation was not expired – proceed normally.
+    @classmethod
+    def admin_cancel_reservation(cls, reservation_id, admin_user_id):
+        """Cancel a reservation as support/admin (no ownership check)."""
+        return cls._cancel_reservation_impl(
+            user_id=None,
+            reservation_id=reservation_id,
+            support_user_id=admin_user_id,
+            enforce_ownership=False
+        )

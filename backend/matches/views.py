@@ -9,8 +9,8 @@ from .repositories.match_repository import MatchRepository
 from .repositories.reservation_repository import ReservationRepository
 from .services.reservation_service import ReservationService
 from matches.services.reservation_cancellation_service import ReservationCancellationService
-from matches.serializers import CancelReservationSerializer, ReserveTicketSerializer
-
+from matches.serializers import CancelReservationSerializer
+from users.utils.permissions import is_support_or_admin
 
 class MatchListView(APIView):
     permission_classes = [AllowAny]
@@ -121,5 +121,22 @@ class UserBookingsView(APIView):
                     elif isinstance(value, Decimal):
                         row[key] = float(value)
             return Response({"success": True, "data": rows}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"success": False, "error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class AdminCancelReservationView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, reservation_id):
+        if not is_support_or_admin(request.user):
+            return Response({"success": False, "error": "Not authorized."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            result = ReservationCancellationService.admin_cancel_reservation(
+                reservation_id=reservation_id,
+                admin_user_id=request.user.id
+            )
+            return Response({"success": True, "data": result}, status=status.HTTP_200_OK)
+        except ValueError as e:
+            return Response({"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"success": False, "error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

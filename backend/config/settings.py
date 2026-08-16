@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'payments',
     'tickets',
     'reports',
+    'locations',
 ]
 
 MIDDLEWARE = [
