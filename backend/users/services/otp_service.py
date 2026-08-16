@@ -29,7 +29,7 @@ class OTPService:
         Generates a 6-digit OTP code, stores it in Redis with a TTL, and returns it.
         Enforces a request rate limit (max 3 requests per 10 minutes per phone).
         """
-        request_key = f"otp_request_count:{phone}"
+        request_key = f"otp_request_count:{phone_number}"
 
         # Increment request counter; if this is the first increment, set expiry window
         count = redis_client.incr(request_key)
@@ -43,7 +43,7 @@ class OTPService:
 
         # Generate OTP and store with expiry
         otp_code = f"{random.randint(100000, 999999)}"
-        key = f"otp:{phone}"
+        key = f"otp:{phone_number}"
         redis_client.setex(key, OTPService.OTP_EXPIRY_SECONDS, otp_code)
         return otp_code
 
@@ -54,7 +54,7 @@ class OTPService:
         Tracks failed attempts and locks out after exceeding the limit.
         Removes the OTP key and failure counter upon successful verification.
         """
-        fail_key = f"otp_fail_count:{phone}"
+        fail_key = f"otp_fail_count:{phone_number}"
 
         # Check if already locked out
         fail_count = redis_client.get(fail_key)
@@ -63,10 +63,10 @@ class OTPService:
                 "Too many failed OTP verification attempts. Please try again later."
             )
 
-        key = f"otp:{phone}"
+        key = f"otp:{phone_number}"
         stored_code = redis_client.get(key)
 
-        if stored_code and stored_code == submitted_code:
+        if stored_code and stored_code == code:
             # Success: delete OTP and failure counter
             redis_client.delete(key)
             redis_client.delete(fail_key)
