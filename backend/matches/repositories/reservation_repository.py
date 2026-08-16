@@ -51,6 +51,7 @@ class ReservationRepository:
         """
         base_query = """
                 SELECT r.id AS reservation_id,
+                       r.ticket_id,
                        r.status,
                        r.reserve_time,
                        r.expire_time,
