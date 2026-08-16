@@ -122,6 +122,9 @@ export default function MyBookingsPage() {
                   <p classname="front-semibold">
                     Ticket id: {booking.ticket_id}
                   </p>
+                  <p classname="front-semibold">
+                    Reservation id: {booking.reservation_id}
+                  </p>
                   <p className="font-semibold">
                     {booking.home_team} vs {booking.away_team}
                   </p>
