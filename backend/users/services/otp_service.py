@@ -2,42 +2,31 @@ import random
 import redis
 from django.conf import settings
 
-# Initialize connection to the Redis container / instance
+# Initialize Redis client connection
 redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
 
-
 class OTPService:
-    """
-    Handles OTP generation, temporary storage in Redis, and verification.
-    """
-
-    OTP_EXPIRY_SECONDS = 120  # OTP is valid for 2 minutes
-
     @staticmethod
-    def generate_otp(phone: str) -> str:
+    def generate_otp(phone_number: str) -> str:
         """
-        Generates a 6-digit OTP code, stores it in Redis with a TTL, and returns it.
+        Generates a 6-digit verification code, stores it in Redis with 
+        a 120-second expiration time, and prepares it for sending.
         """
-        otp_code = f"{random.randint(100000, 999999)}"
+        otp_code = str(random.randint(100000, 999999))
+        redis_client.setex(f"otp:{phone_number}", 120, otp_code)
         
-        # Redis key format: 'otp:<phone_number>'
-        key = f"otp:{phone}"
-        redis_client.setex(key, OTPService.OTP_EXPIRY_SECONDS, otp_code)
-        
+        # Logging dynamic OTP code for local debugging environments
+        print(f"[DEBUG] OTP generated for {phone_number}: {otp_code}")
         return otp_code
 
     @staticmethod
-    def verify_otp(phone: str, submitted_code: str) -> bool:
+    def verify_otp(phone_number: str, code: str) -> bool:
         """
-        Verifies the submitted OTP against the stored one in Redis.
-        Removes the OTP key from Redis upon successful verification to prevent reuse.
+        Verifies the provided OTP code against the Redis value.
+        Deletes the OTP code immediately upon successful validation to prevent reuse.
         """
-        key = f"otp:{phone}"
-        stored_code = redis_client.get(key)
-        
-        if stored_code and stored_code == submitted_code:
-            redis_client.delete(key)
+        stored_code = redis_client.get(f"otp:{phone_number}")
+        if stored_code and stored_code == code:
+            redis_client.delete(f"otp:{phone_number}")
             return True
-            
         return False
-
