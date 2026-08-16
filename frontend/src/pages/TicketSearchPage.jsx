@@ -208,6 +208,9 @@ export default function TicketSearchPage() {
             key={ticket.ticket_id}
             className="rounded border bg-white p-4 shadow-sm transition hover:shadow-md"
           >
+            <p classname="front-semibold">
+              ticket id: {ticket.ticket_id}
+            </p>
             <p className="font-semibold">
               {ticket.home_team} vs {ticket.away_team}
             </p>
