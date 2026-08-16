@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from datetime import datetime, date
 from decimal import Decimal
+from .serializers import ReserveTicketSerializer
 
 from .repositories.match_repository import MatchRepository
 from .repositories.reservation_repository import ReservationRepository
