@@ -119,6 +119,9 @@ export default function MyBookingsPage() {
             >
               <div className="flex items-start justify-between">
                 <div>
+                  <p classname="front-semibold">
+                    Ticket id: {booking.ticket_id}
+                  </p>
                   <p className="font-semibold">
                     {booking.home_team} vs {booking.away_team}
                   </p>
